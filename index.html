@@ -67,6 +67,10 @@
     border: none; border-radius: 6px; cursor: pointer; white-space: nowrap;
   }
   .add-btn:hover { background: #2980b9; }
+  .toolbar select#rep-filter {
+    padding: 9px 12px; font-size: 14px; border: 1px solid #ccd2d8; border-radius: 6px;
+    font-family: inherit; background: #fff; color: #555; cursor: pointer;
+  }
 
   .count-line { font-size: 13px; color: #777; margin: 0 2px 10px; }
 
@@ -182,11 +186,14 @@
   .row-add:hover { background: #d6ebf8; }
   .dyn-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
   .dyn-row input { padding: 8px 10px; font-size: 13px; border: 1px solid #ccd2d8; border-radius: 6px; font-family: inherit; }
+  .dyn-row select { padding: 8px 10px; font-size: 13px; border: 1px solid #ccd2d8; border-radius: 6px; font-family: inherit; background: #fff; }
   .dyn-row .row-del {
-    flex: 0 0 auto; width: 30px; height: 34px; border: none; border-radius: 6px;
-    background: #f4d7d4; color: #c0392b; font-size: 16px; cursor: pointer; line-height: 1;
+    flex: 0 0 auto; width: 36px; height: 34px; border: 1px solid #ccd2d8; border-radius: 6px;
+    background: #fff; color: #666; cursor: pointer; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
   }
-  .dyn-row .row-del:hover { background: #efc2bd; }
+  .dyn-row .row-del:hover { background: #f0f3f6; color: #333; }
+  .dyn-row .row-del svg { width: 16px; height: 16px; display: block; }
   .dyn-empty { font-size: 12px; color: #aaa; margin-bottom: 8px; }
 
   .btn-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; flex-wrap: wrap; }
@@ -244,6 +251,9 @@
       <button type="button" class="filter-btn" data-imp="B">B</button>
       <button type="button" class="filter-btn" data-imp="C">C</button>
     </div>
+    <select id="rep-filter" aria-label="営業担当で絞り込み">
+      <option value="ALL">すべての担当</option>
+    </select>
     <button type="button" class="add-btn" id="add-btn">＋ 新規登録</button>
   </div>
 
@@ -282,7 +292,7 @@
     </div>
     <div class="field">
       <label>営業担当</label>
-      <input type="text" id="f-rep" placeholder="担当者名">
+      <select id="f-rep"></select>
     </div>
     <div class="field">
       <label>重要度</label>
@@ -368,11 +378,49 @@
   /* ===== 状態 ===== */
   var customers = [];            // {id, company, rep, importance, products[], history[], memo, updatedAt}
   var filterImp = "ALL";
+  var filterRep = "ALL";
   var keyword = "";
   var sortKey = "importance";
   var sortAsc = true;
   var editId = null;
   var pendingDeleteId = null;
+
+  /* 営業担当の選択肢（新規登録・編集のプルダウン） */
+  var REPS = ["高井", "田中", "鈴木", "吉田", "仁科"];
+
+  /* 取引商品カタログ（発注書テンプレートの商品名／新規登録のプルダウン） */
+  var PRODUCT_CATALOG = [
+    "ファイヤーバーグ（タレ付）",
+    "チーズインファイヤーバーグ（タレ付）",
+    "ポテトサラダインファイヤーバーグ（タレ付）",
+    "焼成ファイヤーバーグ（タレ付）",
+    "ファイヤーバーグ　レギュラー　徳用3P入り",
+    "北海道産北の恵みハンバーグ",
+    "北海道森町産ホタテ入り生ハンバーグ",
+    "BI　牛100%ハンバーグ（デミソース付）",
+    "十勝豚丼（タレ付き）",
+    "BI　十勝コーンスープ",
+    "札幌ザンギ（油調）",
+    "焼肉あぼじホルモン　うま塩",
+    "焼肉あぼじホルモン　スパイシー",
+    "焼肉あぼじホルモン　コク味噌",
+    "焼肉あぼじホルモン　ニンニクピリ辛",
+    "焼肉あぼじホルモン　塩レモン",
+    "すみれ監修　豚ホルモン　うま塩",
+    "すみれ監修　豚ホルモン　こく味噌",
+    "すみれ監修　ジンギスカン　こく味噌",
+    "すみれ監修　ジンギスカン　濃厚醤油",
+    "チャグリチゲ　豚肉",
+    "チャグリチゲ　鶏肉",
+    "チャグリチゲ　ホルモン",
+    "鳥辰本店　室蘭焼き鳥（調理済）",
+    "焼肉あぼじ　本格牛カルビ焼き（調理済）",
+    "とんかつのみしな　カツスパ（調理済）",
+    "とんかつのみしな　カツカレー（調理済）"
+  ];
+
+  /* 削除ボタン用ゴミ箱アイコン（白黒） */
+  var TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
 
   /* ===== ロック解除 ===== */
   function unlock() {
@@ -434,6 +482,7 @@
     var kw = keyword.trim().toLowerCase();
     var list = customers.filter(function (c) {
       if (filterImp !== "ALL" && c.importance !== filterImp) return false;
+      if (filterRep !== "ALL" && c.rep !== filterRep) return false;
       if (kw) {
         var hay = ((c.company || "") + " " + (c.rep || "")).toLowerCase();
         if (hay.indexOf(kw) === -1) return false;
@@ -474,6 +523,20 @@
       document.querySelector('[data-arrow="' + k + '"]').textContent =
         sortKey === k ? (sortAsc ? "▲" : "▼") : "";
     });
+  }
+
+  /* 営業担当フィルタの選択肢を現在のデータから生成 */
+  function buildRepFilter() {
+    var sel = document.getElementById("rep-filter");
+    var reps = [];
+    customers.forEach(function (c) { if (c.rep && reps.indexOf(c.rep) === -1) reps.push(c.rep); });
+    reps.sort(function (a, b) { return a.localeCompare(b, "ja"); });
+    var cur = sel.value || "ALL";
+    if (cur !== "ALL" && reps.indexOf(cur) === -1) cur = "ALL";
+    sel.innerHTML = '<option value="ALL">すべての担当</option>' +
+      reps.map(function (r) { return '<option value="' + esc(r) + '">' + esc(r) + '</option>'; }).join("");
+    sel.value = cur;
+    filterRep = cur;
   }
 
   /* ===== 詳細モーダル ===== */
@@ -532,10 +595,17 @@
   function productRow(name, price) {
     var div = document.createElement("div");
     div.className = "dyn-row";
+    var opts = '<option value="">商品を選択</option>';
+    var inCatalog = false;
+    PRODUCT_CATALOG.forEach(function (p) {
+      opts += '<option value="' + esc(p) + '">' + esc(p) + '</option>';
+      if (p === name) inCatalog = true;
+    });
+    if (name && !inCatalog) opts += '<option value="' + esc(name) + '">' + esc(name) + '（登録済）</option>';
     div.innerHTML =
-      '<input type="text" class="p-name" placeholder="商品名" style="flex:2;">' +
+      '<select class="p-name" style="flex:2;">' + opts + '</select>' +
       '<input type="number" class="p-price" placeholder="価格" style="flex:1;" min="0" step="1">' +
-      '<button type="button" class="row-del" title="削除">×</button>';
+      '<button type="button" class="row-del" title="削除">' + TRASH_SVG + '</button>';
     div.querySelector(".p-name").value = name || "";
     div.querySelector(".p-price").value = (price === 0 || price) ? price : "";
     div.querySelector(".row-del").addEventListener("click", function () {
@@ -550,7 +620,7 @@
       '<input type="date" class="h-date" style="flex:0 0 150px;">' +
       '<input type="text" class="h-content" placeholder="取引内容" style="flex:2;">' +
       '<input type="number" class="h-amount" placeholder="金額" style="flex:1;" min="0" step="1">' +
-      '<button type="button" class="row-del" title="削除">×</button>';
+      '<button type="button" class="row-del" title="削除">' + TRASH_SVG + '</button>';
     div.querySelector(".h-date").value = date || "";
     div.querySelector(".h-content").value = content || "";
     div.querySelector(".h-amount").value = (amount === 0 || amount) ? amount : "";
@@ -574,7 +644,13 @@
     var c = id ? customers.filter(function (x) { return x.id === id; })[0] : null;
     document.getElementById("edit-title").textContent = c ? "取引先の編集" : "新規登録";
     document.getElementById("f-company").value = c ? (c.company || "") : "";
-    document.getElementById("f-rep").value = c ? (c.rep || "") : "";
+    var repVal = c ? (c.rep || "") : "";
+    var repList = REPS.slice();
+    if (repVal && repList.indexOf(repVal) === -1) repList.push(repVal);
+    document.getElementById("f-rep").innerHTML =
+      '<option value="">（未設定）</option>' +
+      repList.map(function (r) { return '<option value="' + esc(r) + '">' + esc(r) + '</option>'; }).join("");
+    document.getElementById("f-rep").value = repVal;
     document.getElementById("f-importance").value = c ? (c.importance || "B") : "B";
     document.getElementById("f-memo").value = c ? (c.memo || "") : "";
     document.getElementById("edit-err").textContent = "";
@@ -693,6 +769,7 @@
         };
       });
       document.getElementById("db-warn").style.display = "none";
+      buildRepFilter();
       renderList();
     }, function (err) {
       console.warn("顧客データの読み込みに失敗しました", err);
@@ -711,6 +788,9 @@
       filterImp = b.getAttribute("data-imp");
       renderList();
     });
+  });
+  document.getElementById("rep-filter").addEventListener("change", function () {
+    filterRep = this.value; renderList();
   });
   Array.prototype.forEach.call(document.querySelectorAll("thead th.sortable"), function (th) {
     th.addEventListener("click", function () {
