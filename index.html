@@ -78,10 +78,19 @@
     padding: 9px 12px; font-size: 14px; border: 1px solid #ccd2d8; border-radius: 6px;
     font-family: inherit; background: #fff; color: #555; cursor: pointer;
   }
-  .toolbar .month-pick { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #555; white-space: nowrap; }
-  .toolbar .month-pick input {
-    padding: 8px 10px; font-size: 14px; border: 1px solid #ccd2d8; border-radius: 6px; font-family: inherit;
+  .toolbar .month-pick { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: #555; white-space: nowrap; }
+  .toolbar .month-pick .mp-label { margin-right: 2px; }
+  .toolbar .month-pick .mp-select {
+    padding: 8px 10px; font-size: 14px; border: 1px solid #ccd2d8; border-radius: 6px;
+    font-family: inherit; background: #fff; color: #555; cursor: pointer;
   }
+  .toolbar .month-pick .mp-arrow {
+    width: 30px; height: 34px; font-size: 18px; line-height: 1;
+    border: 1px solid #ccd2d8; background: #fff; color: var(--accent-color);
+    border-radius: 6px; cursor: pointer; padding: 0;
+  }
+  .toolbar .month-pick .mp-arrow:hover { background: #eef6fc; }
+  .toolbar .month-pick .mp-arrow:disabled { color: #ccd2d8; cursor: default; background: #f7f8f9; }
 
   .count-line { font-size: 13px; color: #777; margin: 0 2px 10px; }
 
@@ -105,8 +114,15 @@
   tbody tr:last-child td { border-bottom: none; }
   td.company { font-weight: 600; color: var(--main-color); }
   td.company .c-detail { display: block; font-size: 11px; color: #8a929b; font-weight: 400; margin-top: 3px; line-height: 1.45; }
-  td.products { font-size: 12px; color: #556; line-height: 1.45; max-width: 260px; }
+  td.products { font-size: 12px; color: #556; line-height: 1.45; }
   td.products .p-none { color: #bbb; }
+  /* 列幅：取引商品を広く、担当・重要度・金額・昨対比は狭く */
+  thead th:nth-child(2), tbody td:nth-child(2) { width: 32%; }                                   /* 取引商品 */
+  thead th:nth-child(3), tbody td:nth-child(3) { width: 66px; white-space: nowrap; }             /* 営業担当 */
+  thead th:nth-child(4), tbody td:nth-child(4) { width: 54px; white-space: nowrap; text-align: center; } /* 重要度 */
+  thead th:nth-child(5), tbody td:nth-child(5),
+  thead th:nth-child(6), tbody td:nth-child(6) { width: 106px; }                                 /* 金額 */
+  thead th:nth-child(7), tbody td:nth-child(7) { width: 62px; }                                  /* 昨対比 */
   td.month-amt { text-align: right; white-space: nowrap; color: #333; font-variant-numeric: tabular-nums; }
   td.prev-amt { text-align: right; white-space: nowrap; color: #888; font-variant-numeric: tabular-nums; }
   td.yoy { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -123,6 +139,7 @@
   .imp-A { background: var(--imp-a); }
   .imp-B { background: var(--imp-b); }
   .imp-C { background: var(--imp-c); }
+  .imp-none { color: #bbb; }
 
   footer { text-align: center; padding: 24px; font-size: 12px; color: #999; }
 
@@ -243,32 +260,41 @@
     .dyn-row { flex-wrap: wrap; }
   }
 
-  /* ===== A4印刷（毎月の報告用） ===== */
+  /* ===== A4印刷（毎月の報告用・縦／できるだけ少ない枚数） ===== */
   @media print {
-    @page { size: A4 landscape; margin: 12mm; }
+    @page { size: A4 portrait; margin: 8mm; }
     body { background: #fff; }
     header, .toolbar, .count-line, .db-warn, footer, .overlay { display: none !important; }
     main { max-width: none; margin: 0; padding: 0; }
     .table-wrap { box-shadow: none; border-radius: 0; overflow: visible; }
 
-    .print-header { display: block; margin-bottom: 10px; }
-    .print-header .p-title { font-size: 18px; font-weight: 700; color: #000; }
-    .print-header .p-meta { font-size: 11px; color: #333; margin-top: 5px; line-height: 1.5; }
+    .print-header { display: block; margin-bottom: 6px; }
+    .print-header .p-title { font-size: 14px; font-weight: 700; color: #000; }
+    .print-header .p-meta { font-size: 9px; color: #333; margin-top: 3px; line-height: 1.4; }
 
-    table { font-size: 11px; }
+    table { font-size: 8.5px; }
     thead { display: table-header-group; }         /* 各ページ先頭に見出しを繰り返す */
     thead th {
       background: #e8ecef !important; color: #000;
-      padding: 6px 8px; border: 1px solid #999;
+      padding: 2px 4px; border: 1px solid #999; white-space: nowrap;
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
-    tbody td { padding: 5px 8px; border: 1px solid #ccc; }
+    tbody td { padding: 1.5px 4px; border: 1px solid #ccc; }
     tbody tr { page-break-inside: avoid; }
     tbody tr:hover { background: none; }
+    /* 印刷時の列幅（取引商品を広く、他は狭く） */
+    thead th:nth-child(3), tbody td:nth-child(3) { width: 40px; }   /* 営業担当 */
+    thead th:nth-child(4), tbody td:nth-child(4) { width: 30px; }   /* 重要度 */
+    thead th:nth-child(5), tbody td:nth-child(5),
+    thead th:nth-child(6), tbody td:nth-child(6) { width: 62px; }   /* 金額 */
+    thead th:nth-child(7), tbody td:nth-child(7) { width: 38px; }   /* 昨対比 */
+    /* 企業名の下の詳細と重要度バッジも小さく */
+    td.company .c-detail { font-size: 7.5px; margin-top: 1px; }
+    td.products { font-size: 8px; }
+    .imp { min-width: 0; padding: 1px 4px; font-size: 8px; border: 1px solid #999; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     /* 昨対比の色を印刷にも反映 */
     td.yoy.yoy-up { color: #1d4ed8 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     td.yoy.yoy-down { color: #c0392b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .imp { border: 1px solid #999; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
 </style>
 </head>
@@ -309,7 +335,12 @@
     <select id="rep-filter" aria-label="営業担当で絞り込み">
       <option value="ALL">すべての担当</option>
     </select>
-    <label class="month-pick">表示月 <input type="month" id="month-select"></label>
+    <div class="month-pick">
+      <span class="mp-label">表示月</span>
+      <button type="button" class="mp-arrow" id="month-prev" aria-label="前の月">‹</button>
+      <select id="month-select" class="mp-select" aria-label="表示月を選択"></select>
+      <button type="button" class="mp-arrow" id="month-next" aria-label="次の月">›</button>
+    </div>
     <button type="button" class="print-btn" id="print-btn">🖨 印刷（A4）</button>
     <button type="button" class="add-btn" id="add-btn">＋ 新規登録</button>
   </div>
@@ -361,6 +392,7 @@
     <div class="field">
       <label>重要度</label>
       <select id="f-importance">
+        <option value="">（未入力）</option>
         <option value="A">A（最重要）</option>
         <option value="B" selected>B（重要）</option>
         <option value="C">C（通常）</option>
@@ -557,6 +589,60 @@
     var keys = Object.keys(months).sort();
     return keys.length ? keys[keys.length - 1] : currentMonthPrefix();
   }
+  /* データ中に存在する取引月（昇順） */
+  function allDataMonths() {
+    var set = {};
+    customers.forEach(function (c) {
+      (c.history || []).forEach(function (h) {
+        if (h && typeof h.date === "string" && /^\d{4}-\d{2}/.test(h.date)) set[h.date.slice(0, 7)] = 1;
+      });
+    });
+    return Object.keys(set).sort();
+  }
+  /* minYm～maxYm を連続した月配列に展開 */
+  function monthRange(minYm, maxYm) {
+    var out = [], a = minYm.split("-"), b = maxYm.split("-");
+    var y = Number(a[0]), m = Number(a[1]), ey = Number(b[0]), em = Number(b[1]);
+    while (y < ey || (y === ey && m <= em)) {
+      out.push(y + "-" + String(m).padStart(2, "0"));
+      m++; if (m > 12) { m = 1; y++; }
+    }
+    return out;
+  }
+  /* 月選択プルダウンを「◯年◯月」表記で生成 */
+  function buildMonthOptions() {
+    var sel = document.getElementById("month-select");
+    if (!sel) return;
+    var months = allDataMonths();
+    if (!selectedMonth) selectedMonth = latestDataMonth();
+    var range = months.length ? monthRange(months[0], months[months.length - 1]) : [selectedMonth];
+    if (range.indexOf(selectedMonth) === -1) { range.push(selectedMonth); range.sort(); }
+    sel.innerHTML = range.map(function (ym) {
+      return '<option value="' + ym + '">' + monthLabel(ym) + "</option>";
+    }).join("");
+    sel.value = selectedMonth;
+    updateMonthArrows();
+  }
+  /* 前後の矢印の有効/無効を更新 */
+  function updateMonthArrows() {
+    var sel = document.getElementById("month-select");
+    var prev = document.getElementById("month-prev");
+    var next = document.getElementById("month-next");
+    if (!sel || !prev || !next) return;
+    prev.disabled = sel.selectedIndex <= 0;
+    next.disabled = sel.selectedIndex >= sel.options.length - 1;
+  }
+  /* 矢印で月を1つ移動 */
+  function stepMonth(dir) {
+    var sel = document.getElementById("month-select");
+    if (!sel || !sel.options.length) return;
+    var ni = sel.selectedIndex + dir;
+    if (ni < 0 || ni >= sel.options.length) return;
+    sel.selectedIndex = ni;
+    selectedMonth = sel.value;
+    updateMonthArrows();
+    renderList();
+  }
   /* 指定月(ym="YYYY-MM")の取引金額合計。該当がなければ 0 */
   function monthAmount(c, ym) {
     var sum = 0;
@@ -674,7 +760,7 @@
             (c.memo ? '<span class="c-detail">' + esc(c.memo) + "</span>" : "") + "</td>" +
           '<td class="products">' + prodCell + "</td>" +
           '<td>' + esc(c.rep || "—") + "</td>" +
-          '<td><span class="imp imp-' + esc(c.importance || "C") + '">' + esc(c.importance || "C") + "</span></td>" +
+          '<td>' + (c.importance ? '<span class="imp imp-' + esc(c.importance) + '">' + esc(c.importance) + "</span>" : '<span class="imp-none">—</span>') + "</td>" +
           '<td class="month-amt">' + esc(yen(monthAmount(c, selectedMonth))) + "</td>" +
           '<td class="prev-amt">' + esc(yen(monthAmount(c, prevYearMonth(selectedMonth)))) + "</td>" +
           yoyCell(c) +
@@ -734,7 +820,7 @@
 
     document.getElementById("detail-modal").innerHTML =
       '<div class="detail-head">' +
-        '<span class="imp imp-' + esc(c.importance || "C") + '">' + esc(c.importance || "C") + "</span>" +
+        (c.importance ? '<span class="imp imp-' + esc(c.importance) + '">' + esc(c.importance) + "</span>" : '<span class="imp-none">—</span>') +
         '<span class="detail-company">' + esc(c.company || "（無名）") + "</span>" +
       "</div>" +
       '<div class="detail-rep">営業担当：<b>' + esc(c.rep || "未設定") + "</b></div>" +
@@ -854,7 +940,7 @@
       '<option value="">（未設定）</option>' +
       repList.map(function (r) { return '<option value="' + esc(r) + '">' + esc(r) + '</option>'; }).join("");
     document.getElementById("f-rep").value = repVal;
-    document.getElementById("f-importance").value = c ? (c.importance || "B") : "B";
+    document.getElementById("f-importance").value = c ? (c.importance || "") : "B";
     document.getElementById("f-memo").value = c ? (c.memo || "") : "";
     document.getElementById("edit-err").textContent = "";
 
@@ -970,7 +1056,7 @@
           id: k,
           company: v.company || "",
           rep: v.rep || "",
-          importance: v.importance || "C",
+          importance: v.importance || "",
           products: Array.isArray(v.products) ? v.products : [],
           history: Array.isArray(v.history) ? v.history : [],
           memo: v.memo || "",
@@ -979,8 +1065,7 @@
       });
       document.getElementById("db-warn").style.display = "none";
       if (!selectedMonth) selectedMonth = latestDataMonth();
-      var msel = document.getElementById("month-select");
-      if (msel && !msel.value) msel.value = selectedMonth;
+      buildMonthOptions();
       buildRepFilter();
       renderList();
     }, function (err) {
@@ -1006,8 +1091,11 @@
   });
   document.getElementById("month-select").addEventListener("change", function () {
     selectedMonth = this.value || latestDataMonth();
+    updateMonthArrows();
     renderList();
   });
+  document.getElementById("month-prev").addEventListener("click", function () { stepMonth(-1); });
+  document.getElementById("month-next").addEventListener("click", function () { stepMonth(1); });
   document.getElementById("cust-body").addEventListener("click", function (e) {
     var tr = e.target.closest("tr[data-id]");
     if (tr) openDetail(tr.getAttribute("data-id"));
