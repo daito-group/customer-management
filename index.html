@@ -175,12 +175,24 @@
   .modal {
     background: #fff; border-radius: 10px; padding: 24px;
     max-width: 640px; width: 100%; max-height: 90vh; overflow-y: auto;
-    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3); position: relative;
   }
   .modal h3 {
     margin: 0 0 16px; font-size: 17px; color: var(--main-color);
     display: flex; align-items: center; gap: 10px;
   }
+  /* 右上の×（スクロールしても上部に固定） */
+  .modal-close {
+    position: sticky; top: 0; float: right;
+    width: 32px; height: 32px; margin: -6px -6px -32px 8px;
+    border: 1px solid #e3e8ec; background: #f4f6f8; color: #667;
+    border-radius: 8px; font-size: 15px; line-height: 1; cursor: pointer; z-index: 20;
+  }
+  .modal-close:hover { background: #e6ebef; color: #111; }
+  /* 取引履歴が長い場合のスクロール領域 */
+  .hist-scroll { max-height: 300px; overflow-y: auto; border: 1px solid #eef1f4; border-radius: 6px; }
+  .hist-scroll .detail-table thead th { position: sticky; top: 0; z-index: 1; }
+  #history-rows.rows-scroll { max-height: 260px; overflow-y: auto; padding: 2px 4px 2px 2px; }
 
   /* 詳細表示 */
   .detail-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
@@ -380,6 +392,7 @@
 <!-- ===== 編集モーダル ===== -->
 <div class="overlay" id="edit-overlay">
   <div class="modal">
+    <button type="button" class="modal-close" id="edit-x" aria-label="閉じる">✕</button>
     <h3 id="edit-title">新規登録</h3>
     <div class="field">
       <label>取引先企業名 <span class="req">必須</span></label>
@@ -412,7 +425,7 @@
         <label>取引履歴</label>
         <button type="button" class="row-add" id="add-history">＋ 履歴を追加</button>
       </div>
-      <div id="history-rows"></div>
+      <div id="history-rows" class="rows-scroll"></div>
       <datalist id="reg-products"></datalist>
     </div>
 
@@ -432,6 +445,7 @@
 <!-- ===== 削除確認モーダル ===== -->
 <div class="overlay" id="confirm-overlay">
   <div class="modal" style="max-width:400px;">
+    <button type="button" class="modal-close" id="confirm-x" aria-label="閉じる">✕</button>
     <h3>削除の確認</h3>
     <p id="confirm-msg" style="font-size:14px;line-height:1.7;margin:0 0 20px;"></p>
     <div class="btn-row">
@@ -514,6 +528,9 @@
     "とんかつのみしな　カツスパ（調理済）",
     "とんかつのみしな　カツカレー（調理済）"
   ];
+
+  /* 発送エリアの選択肢 */
+  var SHIP_AREAS = ["北海道", "関東", "中部", "近畿", "九州"];
 
   /* 削除ボタン用ゴミ箱アイコン（白黒） */
   var TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
@@ -792,25 +809,27 @@
 
     var prodHtml;
     if (products.length) {
-      prodHtml = '<table class="detail-table"><thead><tr><th>商品名</th><th style="text-align:right;">価格</th></tr></thead><tbody>' +
+      prodHtml = '<table class="detail-table"><thead><tr><th>商品名</th><th>発送エリア</th><th style="text-align:right;">価格</th></tr></thead><tbody>' +
         products.map(function (p) {
-          return "<tr><td>" + esc(p.name || "—") + '</td><td class="num">' + esc(yen(p.price)) + "</td></tr>";
+          return "<tr><td>" + esc(p.name || "—") + "</td><td>" + esc(p.area || "—") +
+            '</td><td class="num">' + esc(yen(p.price)) + "</td></tr>";
         }).join("") + "</tbody></table>";
     } else {
       prodHtml = '<div class="detail-empty">登録された取引商品はありません。</div>';
     }
 
-    var histHtml;
+    var histHtml, histCount = "";
     if (history.length) {
+      histCount = "（全" + history.length + "件）";
       var sortedH = history.slice().sort(function (a, b) {
         return String(b.date || "").localeCompare(String(a.date || ""));
       });
-      histHtml = '<table class="detail-table"><thead><tr><th style="width:100px;">日付</th><th>内容</th><th style="text-align:right;">個数</th><th style="text-align:right;">金額</th></tr></thead><tbody>' +
+      histHtml = '<div class="hist-scroll"><table class="detail-table"><thead><tr><th style="width:100px;">日付</th><th>内容</th><th style="text-align:right;">個数</th><th style="text-align:right;">金額</th></tr></thead><tbody>' +
         sortedH.map(function (h) {
           return "<tr><td>" + esc(h.date || "—") + "</td><td>" + esc(h.content || "") +
             '</td><td class="num">' + esc(h.qty === "" || h.qty == null ? "" : String(h.qty)) +
             '</td><td class="num">' + esc(h.amount === "" || h.amount == null ? "" : yen(h.amount)) + "</td></tr>";
-        }).join("") + "</tbody></table>";
+        }).join("") + "</tbody></table></div>";
     } else {
       histHtml = '<div class="detail-empty">取引履歴はありません。</div>';
     }
@@ -819,13 +838,14 @@
       : '<div class="detail-empty">メモはありません。</div>';
 
     document.getElementById("detail-modal").innerHTML =
+      '<button type="button" class="modal-close" data-detail-close aria-label="閉じる">✕</button>' +
       '<div class="detail-head">' +
         (c.importance ? '<span class="imp imp-' + esc(c.importance) + '">' + esc(c.importance) + "</span>" : '<span class="imp-none">—</span>') +
         '<span class="detail-company">' + esc(c.company || "（無名）") + "</span>" +
       "</div>" +
       '<div class="detail-rep">営業担当：<b>' + esc(c.rep || "未設定") + "</b></div>" +
-      '<div class="section-label">取引商品・価格</div>' + prodHtml +
-      '<div class="section-label">取引履歴</div>' + histHtml +
+      '<div class="section-label">取引商品・価格・発送エリア</div>' + prodHtml +
+      '<div class="section-label">取引履歴' + histCount + "</div>" + histHtml +
       '<div class="section-label">備考・メモ</div>' + memoHtml +
       '<div class="btn-row">' +
         '<button type="button" class="act btn-danger" data-detail-del="' + esc(c.id) + '">削除</button>' +
@@ -875,7 +895,7 @@
       recalcHistoryRow(r);
     });
   }
-  function productRow(name, price) {
+  function productRow(name, price, area) {
     var div = document.createElement("div");
     div.className = "dyn-row";
     var opts = '<option value="">商品を選択</option>';
@@ -885,11 +905,20 @@
       if (p === name) inCatalog = true;
     });
     if (name && !inCatalog) opts += '<option value="' + esc(name) + '">' + esc(name) + '（登録済）</option>';
+    var areaOpts = '<option value="">エリア</option>';
+    var inArea = false;
+    SHIP_AREAS.forEach(function (a) {
+      areaOpts += '<option value="' + esc(a) + '">' + esc(a) + '</option>';
+      if (a === area) inArea = true;
+    });
+    if (area && !inArea) areaOpts += '<option value="' + esc(area) + '">' + esc(area) + '</option>';
     div.innerHTML =
       '<select class="p-name" style="flex:2;">' + opts + '</select>' +
+      '<select class="p-area" style="flex:0 0 96px;">' + areaOpts + '</select>' +
       '<input type="number" class="p-price" placeholder="価格" style="flex:1;" min="0" step="1">' +
       '<button type="button" class="row-del" title="削除">' + TRASH_SVG + '</button>';
     div.querySelector(".p-name").value = name || "";
+    div.querySelector(".p-area").value = area || "";
     div.querySelector(".p-price").value = (price === 0 || price) ? price : "";
     div.querySelector(".p-name").addEventListener("change", onProductsChanged);
     div.querySelector(".p-price").addEventListener("input", onProductsChanged);
@@ -949,7 +978,7 @@
     pr.innerHTML = ""; hr.innerHTML = "";
     var products = (c && c.products) || [];
     var history = (c && c.history) || [];
-    products.forEach(function (p) { pr.appendChild(productRow(p.name, p.price)); });
+    products.forEach(function (p) { pr.appendChild(productRow(p.name, p.price, p.area)); });
     history.forEach(function (h) { hr.appendChild(historyRow(h.date, h.content, h.qty, h.amount)); });
     refreshRegProducts();
     checkDynEmpty();
@@ -963,8 +992,9 @@
     var products = [];
     Array.prototype.forEach.call(document.querySelectorAll("#product-rows .dyn-row"), function (r) {
       var name = r.querySelector(".p-name").value.trim();
+      var area = r.querySelector(".p-area").value;
       var price = r.querySelector(".p-price").value.trim();
-      if (name || price) products.push({ name: name, price: price === "" ? "" : Number(price) });
+      if (name || price || area) products.push({ name: name, area: area, price: price === "" ? "" : Number(price) });
     });
     var history = [];
     Array.prototype.forEach.call(document.querySelectorAll("#history-rows .dyn-row"), function (r) {
@@ -1117,6 +1147,8 @@
   });
   document.getElementById("edit-save").addEventListener("click", saveEdit);
   document.getElementById("edit-cancel").addEventListener("click", closeEdit);
+  document.getElementById("edit-x").addEventListener("click", closeEdit);
+  document.getElementById("confirm-x").addEventListener("click", closeConfirm);
 
   // 詳細モーダル内のボタン（委任）
   document.getElementById("detail-modal").addEventListener("click", function (e) {
