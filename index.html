@@ -67,6 +67,13 @@
     border: none; border-radius: 6px; cursor: pointer; white-space: nowrap;
   }
   .add-btn:hover { background: #2980b9; }
+  .print-btn {
+    padding: 9px 16px; font-size: 14px; font-weight: 600;
+    background: #fff; color: var(--accent-color);
+    border: 1px solid var(--accent-color); border-radius: 6px; cursor: pointer; white-space: nowrap;
+  }
+  .print-btn:hover { background: #eef6fc; }
+  .print-header { display: none; }
   .toolbar select#rep-filter {
     padding: 9px 12px; font-size: 14px; border: 1px solid #ccd2d8; border-radius: 6px;
     font-family: inherit; background: #fff; color: #555; cursor: pointer;
@@ -97,6 +104,9 @@
   tbody tr:hover { background: #f6fafd; }
   tbody tr:last-child td { border-bottom: none; }
   td.company { font-weight: 600; color: var(--main-color); }
+  td.company .c-detail { display: block; font-size: 11px; color: #8a929b; font-weight: 400; margin-top: 3px; line-height: 1.45; }
+  td.products { font-size: 12px; color: #556; line-height: 1.45; max-width: 260px; }
+  td.products .p-none { color: #bbb; }
   td.month-amt { text-align: right; white-space: nowrap; color: #333; font-variant-numeric: tabular-nums; }
   td.prev-amt { text-align: right; white-space: nowrap; color: #888; font-variant-numeric: tabular-nums; }
   td.yoy { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -232,6 +242,34 @@
     thead th.hide-sp, tbody td.hide-sp { display: none; }
     .dyn-row { flex-wrap: wrap; }
   }
+
+  /* ===== A4印刷（毎月の報告用） ===== */
+  @media print {
+    @page { size: A4 landscape; margin: 12mm; }
+    body { background: #fff; }
+    header, .toolbar, .count-line, .db-warn, footer, .overlay { display: none !important; }
+    main { max-width: none; margin: 0; padding: 0; }
+    .table-wrap { box-shadow: none; border-radius: 0; overflow: visible; }
+
+    .print-header { display: block; margin-bottom: 10px; }
+    .print-header .p-title { font-size: 18px; font-weight: 700; color: #000; }
+    .print-header .p-meta { font-size: 11px; color: #333; margin-top: 5px; line-height: 1.5; }
+
+    table { font-size: 11px; }
+    thead { display: table-header-group; }         /* 各ページ先頭に見出しを繰り返す */
+    thead th {
+      background: #e8ecef !important; color: #000;
+      padding: 6px 8px; border: 1px solid #999;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    tbody td { padding: 5px 8px; border: 1px solid #ccc; }
+    tbody tr { page-break-inside: avoid; }
+    tbody tr:hover { background: none; }
+    /* 昨対比の色を印刷にも反映 */
+    td.yoy.yoy-up { color: #1d4ed8 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    td.yoy.yoy-down { color: #c0392b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .imp { border: 1px solid #999; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
 </style>
 </head>
 <body class="locked">
@@ -272,16 +310,21 @@
       <option value="ALL">すべての担当</option>
     </select>
     <label class="month-pick">表示月 <input type="month" id="month-select"></label>
+    <button type="button" class="print-btn" id="print-btn">🖨 印刷（A4）</button>
     <button type="button" class="add-btn" id="add-btn">＋ 新規登録</button>
   </div>
 
   <div class="count-line" id="count-line"></div>
+
+  <!-- 印刷時のみ表示されるレポート見出し -->
+  <div class="print-header" id="print-header"></div>
 
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
           <th>取引先企業名</th>
+          <th>取引商品</th>
           <th>営業担当</th>
           <th>重要度</th>
           <th id="amt-col-head" style="text-align:right; white-space:nowrap;">取引金額</th>
@@ -530,6 +573,11 @@
     var p = ym.split("-");
     return p[0] + "年" + Number(p[1]) + "月";
   }
+  /* 出力日（"2026年7月9日"） */
+  function printDate() {
+    var d = new Date();
+    return d.getFullYear() + "年" + (d.getMonth() + 1) + "月" + d.getDate() + "日";
+  }
   /* 前年同月（"2026-05" → "2025-05"） */
   function prevYearMonth(ym) {
     if (!ym || ym.indexOf("-") === -1) return "";
@@ -588,14 +636,43 @@
     document.getElementById("count-line").textContent =
       "全 " + customers.length + " 件" + (list.length !== customers.length ? "（表示 " + list.length + " 件）" : "");
 
+    /* 印刷用レポート見出し（合計・昨対比・出力日など） */
+    var ph = document.getElementById("print-header");
+    if (ph) {
+      var totCur = 0, totPrev = 0;
+      list.forEach(function (c) {
+        totCur += monthAmount(c, selectedMonth);
+        totPrev += monthAmount(c, prevYearMonth(selectedMonth));
+      });
+      var totYoy = totPrev > 0 ? (totCur / totPrev * 100).toFixed(1) + "%" : "—";
+      var ftxt = [];
+      if (filterRep !== "ALL") ftxt.push("担当: " + filterRep);
+      if (filterImp !== "ALL") ftxt.push("重要度: " + filterImp);
+      if (keyword.trim()) ftxt.push("検索: " + keyword.trim());
+      ph.innerHTML =
+        '<div class="p-title">DAITO営業部　顧客別取引一覧（' + esc(monthLabel(selectedMonth)) + "）</div>" +
+        '<div class="p-meta">' +
+          "対象: " + list.length + "件" +
+          (ftxt.length ? "　｜　" + esc(ftxt.join(" / ")) : "") +
+          "　｜　当月合計: " + esc(yen(totCur)) +
+          "　｜　前年同月: " + esc(yen(totPrev)) +
+          "　｜　昨対比: " + totYoy +
+          "　｜　出力日: " + printDate() +
+        "</div>";
+    }
+
     if (!list.length) {
-      body.innerHTML = '<tr class="empty-row"><td colspan="6">' +
+      body.innerHTML = '<tr class="empty-row"><td colspan="7">' +
         (customers.length ? "該当する取引先がありません。" : "まだ取引先が登録されていません。「＋ 新規登録」から追加してください。") +
         "</td></tr>";
     } else {
       body.innerHTML = list.map(function (c) {
+        var prodNames = (c.products || []).map(function (p) { return p && p.name ? String(p.name).trim() : ""; }).filter(Boolean);
+        var prodCell = prodNames.length ? esc(prodNames.join("、")) : '<span class="p-none">—</span>';
         return '<tr data-id="' + esc(c.id) + '">' +
-          '<td class="company">' + esc(c.company || "（無名）") + "</td>" +
+          '<td class="company">' + esc(c.company || "（無名）") +
+            (c.memo ? '<span class="c-detail">' + esc(c.memo) + "</span>" : "") + "</td>" +
+          '<td class="products">' + prodCell + "</td>" +
           '<td>' + esc(c.rep || "—") + "</td>" +
           '<td><span class="imp imp-' + esc(c.importance || "C") + '">' + esc(c.importance || "C") + "</span></td>" +
           '<td class="month-amt">' + esc(yen(monthAmount(c, selectedMonth))) + "</td>" +
@@ -936,6 +1013,7 @@
     if (tr) openDetail(tr.getAttribute("data-id"));
   });
   document.getElementById("add-btn").addEventListener("click", function () { openEdit(null); });
+  document.getElementById("print-btn").addEventListener("click", function () { window.print(); });
   document.getElementById("add-product").addEventListener("click", function () {
     var pr = document.getElementById("product-rows");
     var empty = pr.querySelector(".dyn-empty"); if (empty) empty.remove();
