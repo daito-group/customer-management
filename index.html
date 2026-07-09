@@ -71,6 +71,10 @@
     padding: 9px 12px; font-size: 14px; border: 1px solid #ccd2d8; border-radius: 6px;
     font-family: inherit; background: #fff; color: #555; cursor: pointer;
   }
+  .toolbar .month-pick { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #555; white-space: nowrap; }
+  .toolbar .month-pick input {
+    padding: 8px 10px; font-size: 14px; border: 1px solid #ccd2d8; border-radius: 6px; font-family: inherit;
+  }
 
   .count-line { font-size: 13px; color: #777; margin: 0 2px 10px; }
 
@@ -262,6 +266,7 @@
     <select id="rep-filter" aria-label="営業担当で絞り込み">
       <option value="ALL">すべての担当</option>
     </select>
+    <label class="month-pick">表示月 <input type="month" id="month-select"></label>
     <button type="button" class="add-btn" id="add-btn">＋ 新規登録</button>
   </div>
 
@@ -272,9 +277,9 @@
       <thead>
         <tr>
           <th>取引先企業名</th>
-          <th class="sortable" data-sort="rep">営業担当 <span class="arrow" data-arrow="rep"></span></th>
-          <th class="sortable" data-sort="importance">重要度 <span class="arrow" data-arrow="importance"></span></th>
-          <th style="text-align:right; white-space:nowrap;">当月取引金額</th>
+          <th>営業担当</th>
+          <th>重要度</th>
+          <th id="amt-col-head" style="text-align:right; white-space:nowrap;">取引金額</th>
         </tr>
       </thead>
       <tbody id="cust-body"></tbody>
@@ -390,8 +395,7 @@
   var filterImp = "ALL";
   var filterRep = "ALL";
   var keyword = "";
-  var sortKey = "rep";
-  var sortAsc = true;
+  var selectedMonth = "";  // 表示中の月 "YYYY-MM"
   var editId = null;
   var pendingDeleteId = null;
 
@@ -487,21 +491,37 @@
   }
   function impRank(imp) { return imp === "A" ? 0 : imp === "B" ? 1 : imp === "C" ? 2 : 3; }
 
-  /* 当月（今の暦月）の取引金額合計 */
+  /* ===== 月別の取引金額 ===== */
   function currentMonthPrefix() {
     var d = new Date();
     return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
   }
-  function monthAmountText(c) {
-    var pref = currentMonthPrefix();
-    var sum = 0, has = false;
+  /* データ中で最も新しい取引月（初期表示に使用） */
+  function latestDataMonth() {
+    var months = {};
+    customers.forEach(function (c) {
+      (c.history || []).forEach(function (h) {
+        if (h && typeof h.date === "string" && /^\d{4}-\d{2}/.test(h.date)) months[h.date.slice(0, 7)] = 1;
+      });
+    });
+    var keys = Object.keys(months).sort();
+    return keys.length ? keys[keys.length - 1] : currentMonthPrefix();
+  }
+  /* 指定月(ym="YYYY-MM")の取引金額合計。該当がなければ 0 */
+  function monthAmount(c, ym) {
+    var sum = 0;
     (c.history || []).forEach(function (h) {
-      if (h && typeof h.date === "string" && h.date.indexOf(pref) === 0) {
+      if (h && typeof h.date === "string" && ym && h.date.indexOf(ym) === 0) {
         var n = Number(h.amount);
-        if (!isNaN(n) && h.amount !== "" && h.amount != null) { sum += n; has = true; }
+        if (!isNaN(n) && h.amount !== "" && h.amount != null) sum += n;
       }
     });
-    return has ? esc(yen(sum)) : "—";
+    return sum;
+  }
+  function monthLabel(ym) {
+    if (!ym || ym.indexOf("-") === -1) return "";
+    var p = ym.split("-");
+    return p[0] + "年" + Number(p[1]) + "月";
   }
 
   /* ===== 一覧描画 ===== */
@@ -517,18 +537,18 @@
       return true;
     });
     list.sort(function (a, b) {
-      var r;
-      if (sortKey === "importance")
-        r = (impRank(a.importance) - impRank(b.importance)) || (a.rep || "").localeCompare(b.rep || "", "ja");
-      else
-        r = (a.rep || "").localeCompare(b.rep || "", "ja") || (impRank(a.importance) - impRank(b.importance));
-      if (r === 0) r = (a.company || "").localeCompare(b.company || "", "ja");
-      return sortAsc ? r : -r;
+      return (a.rep || "").localeCompare(b.rep || "", "ja")
+        || (impRank(a.importance) - impRank(b.importance))
+        || (a.company || "").localeCompare(b.company || "", "ja");
     });
     return list;
   }
 
   function renderList() {
+    if (!selectedMonth) selectedMonth = latestDataMonth();
+    var amtHead = document.getElementById("amt-col-head");
+    if (amtHead) amtHead.textContent = (monthLabel(selectedMonth) ? monthLabel(selectedMonth) + " " : "") + "取引金額";
+
     var body = document.getElementById("cust-body");
     var list = getFiltered();
     document.getElementById("count-line").textContent =
@@ -544,15 +564,10 @@
           '<td class="company">' + esc(c.company || "（無名）") + "</td>" +
           '<td>' + esc(c.rep || "—") + "</td>" +
           '<td><span class="imp imp-' + esc(c.importance || "C") + '">' + esc(c.importance || "C") + "</span></td>" +
-          '<td class="month-amt">' + monthAmountText(c) + "</td>" +
+          '<td class="month-amt">' + esc(yen(monthAmount(c, selectedMonth))) + "</td>" +
           "</tr>";
       }).join("");
     }
-    // 並び替え矢印
-    ["rep", "importance"].forEach(function (k) {
-      document.querySelector('[data-arrow="' + k + '"]').textContent =
-        sortKey === k ? (sortAsc ? "▲" : "▼") : "";
-    });
   }
 
   /* 営業担当フィルタの選択肢を現在のデータから生成 */
@@ -850,6 +865,9 @@
         };
       });
       document.getElementById("db-warn").style.display = "none";
+      if (!selectedMonth) selectedMonth = latestDataMonth();
+      var msel = document.getElementById("month-select");
+      if (msel && !msel.value) msel.value = selectedMonth;
       buildRepFilter();
       renderList();
     }, function (err) {
@@ -873,12 +891,9 @@
   document.getElementById("rep-filter").addEventListener("change", function () {
     filterRep = this.value; renderList();
   });
-  Array.prototype.forEach.call(document.querySelectorAll("thead th.sortable"), function (th) {
-    th.addEventListener("click", function () {
-      var k = th.getAttribute("data-sort");
-      if (sortKey === k) sortAsc = !sortAsc; else { sortKey = k; sortAsc = true; }
-      renderList();
-    });
+  document.getElementById("month-select").addEventListener("change", function () {
+    selectedMonth = this.value || latestDataMonth();
+    renderList();
   });
   document.getElementById("cust-body").addEventListener("click", function (e) {
     var tr = e.target.closest("tr[data-id]");
