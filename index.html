@@ -93,6 +93,7 @@
   tbody tr:hover { background: #f6fafd; }
   tbody tr:last-child td { border-bottom: none; }
   td.company { font-weight: 600; color: var(--main-color); }
+  td.month-amt { text-align: right; white-space: nowrap; color: #333; font-variant-numeric: tabular-nums; }
   .empty-row td { text-align: center; color: #999; padding: 40px 16px; }
 
   .imp {
@@ -194,6 +195,13 @@
   }
   .dyn-row .row-del:hover { background: #f0f3f6; color: #333; }
   .dyn-row .row-del svg { width: 16px; height: 16px; display: block; }
+  .dyn-row .yen-wrap {
+    display: flex; align-items: center; gap: 2px;
+    border: 1px solid #ccd2d8; border-radius: 6px; background: #fff; padding: 0 8px;
+  }
+  .dyn-row .yen-wrap .yen-mark { color: #778; font-size: 13px; flex: 0 0 auto; }
+  .dyn-row .yen-wrap input.h-amount { border: none; background: transparent; padding: 8px 4px; min-width: 0; flex: 1; }
+  .dyn-row .yen-wrap input.h-amount:focus { outline: none; }
   .dyn-empty { font-size: 12px; color: #aaa; margin-bottom: 8px; }
 
   .btn-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px; flex-wrap: wrap; }
@@ -263,9 +271,10 @@
     <table>
       <thead>
         <tr>
-          <th class="sortable" data-sort="company">取引先企業名 <span class="arrow" data-arrow="company"></span></th>
+          <th>取引先企業名</th>
           <th class="sortable" data-sort="rep">営業担当 <span class="arrow" data-arrow="rep"></span></th>
           <th class="sortable" data-sort="importance">重要度 <span class="arrow" data-arrow="importance"></span></th>
+          <th style="text-align:right; white-space:nowrap;">当月取引金額</th>
         </tr>
       </thead>
       <tbody id="cust-body"></tbody>
@@ -317,6 +326,7 @@
         <button type="button" class="row-add" id="add-history">＋ 履歴を追加</button>
       </div>
       <div id="history-rows"></div>
+      <datalist id="reg-products"></datalist>
     </div>
 
     <div class="field">
@@ -380,7 +390,7 @@
   var filterImp = "ALL";
   var filterRep = "ALL";
   var keyword = "";
-  var sortKey = "importance";
+  var sortKey = "rep";
   var sortAsc = true;
   var editId = null;
   var pendingDeleteId = null;
@@ -477,6 +487,23 @@
   }
   function impRank(imp) { return imp === "A" ? 0 : imp === "B" ? 1 : imp === "C" ? 2 : 3; }
 
+  /* 当月（今の暦月）の取引金額合計 */
+  function currentMonthPrefix() {
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  }
+  function monthAmountText(c) {
+    var pref = currentMonthPrefix();
+    var sum = 0, has = false;
+    (c.history || []).forEach(function (h) {
+      if (h && typeof h.date === "string" && h.date.indexOf(pref) === 0) {
+        var n = Number(h.amount);
+        if (!isNaN(n) && h.amount !== "" && h.amount != null) { sum += n; has = true; }
+      }
+    });
+    return has ? esc(yen(sum)) : "—";
+  }
+
   /* ===== 一覧描画 ===== */
   function getFiltered() {
     var kw = keyword.trim().toLowerCase();
@@ -490,10 +517,12 @@
       return true;
     });
     list.sort(function (a, b) {
-      var r = 0;
-      if (sortKey === "company") r = (a.company || "").localeCompare(b.company || "", "ja");
-      else if (sortKey === "rep") r = (a.rep || "").localeCompare(b.rep || "", "ja");
-      else r = impRank(a.importance) - impRank(b.importance) || (a.company || "").localeCompare(b.company || "", "ja");
+      var r;
+      if (sortKey === "importance")
+        r = (impRank(a.importance) - impRank(b.importance)) || (a.rep || "").localeCompare(b.rep || "", "ja");
+      else
+        r = (a.rep || "").localeCompare(b.rep || "", "ja") || (impRank(a.importance) - impRank(b.importance));
+      if (r === 0) r = (a.company || "").localeCompare(b.company || "", "ja");
       return sortAsc ? r : -r;
     });
     return list;
@@ -506,7 +535,7 @@
       "全 " + customers.length + " 件" + (list.length !== customers.length ? "（表示 " + list.length + " 件）" : "");
 
     if (!list.length) {
-      body.innerHTML = '<tr class="empty-row"><td colspan="3">' +
+      body.innerHTML = '<tr class="empty-row"><td colspan="4">' +
         (customers.length ? "該当する取引先がありません。" : "まだ取引先が登録されていません。「＋ 新規登録」から追加してください。") +
         "</td></tr>";
     } else {
@@ -515,11 +544,12 @@
           '<td class="company">' + esc(c.company || "（無名）") + "</td>" +
           '<td>' + esc(c.rep || "—") + "</td>" +
           '<td><span class="imp imp-' + esc(c.importance || "C") + '">' + esc(c.importance || "C") + "</span></td>" +
+          '<td class="month-amt">' + monthAmountText(c) + "</td>" +
           "</tr>";
       }).join("");
     }
     // 並び替え矢印
-    ["company", "rep", "importance"].forEach(function (k) {
+    ["rep", "importance"].forEach(function (k) {
       document.querySelector('[data-arrow="' + k + '"]').textContent =
         sortKey === k ? (sortAsc ? "▲" : "▼") : "";
     });
@@ -561,9 +591,10 @@
       var sortedH = history.slice().sort(function (a, b) {
         return String(b.date || "").localeCompare(String(a.date || ""));
       });
-      histHtml = '<table class="detail-table"><thead><tr><th style="width:110px;">日付</th><th>内容</th><th style="text-align:right;">金額</th></tr></thead><tbody>' +
+      histHtml = '<table class="detail-table"><thead><tr><th style="width:100px;">日付</th><th>内容</th><th style="text-align:right;">個数</th><th style="text-align:right;">金額</th></tr></thead><tbody>' +
         sortedH.map(function (h) {
           return "<tr><td>" + esc(h.date || "—") + "</td><td>" + esc(h.content || "") +
+            '</td><td class="num">' + esc(h.qty === "" || h.qty == null ? "" : String(h.qty)) +
             '</td><td class="num">' + esc(h.amount === "" || h.amount == null ? "" : yen(h.amount)) + "</td></tr>";
         }).join("") + "</tbody></table>";
     } else {
@@ -592,6 +623,44 @@
   function closeDetail() { document.getElementById("detail-overlay").classList.remove("show"); }
 
   /* ===== 動的行（商品／履歴） ===== */
+  /* 登録商品の価格を名前から引く（当該フォームの取引商品行から） */
+  function productPriceByName(name) {
+    if (!name) return "";
+    var found = "";
+    Array.prototype.forEach.call(document.querySelectorAll("#product-rows .dyn-row"), function (r) {
+      var pn = r.querySelector(".p-name").value.trim();
+      var pp = r.querySelector(".p-price").value.trim();
+      if (pn === name && pp !== "") found = pp;
+    });
+    return found;
+  }
+  /* 取引履歴の「取引内容」候補（登録商品）を更新 */
+  function refreshRegProducts() {
+    var dl = document.getElementById("reg-products");
+    if (!dl) return;
+    var seen = {}, opts = "";
+    Array.prototype.forEach.call(document.querySelectorAll("#product-rows .dyn-row"), function (r) {
+      var pn = r.querySelector(".p-name").value.trim();
+      if (pn && !seen[pn]) { seen[pn] = 1; opts += '<option value="' + esc(pn) + '"></option>'; }
+    });
+    dl.innerHTML = opts;
+  }
+  /* 履歴1行の金額を（登録商品の価格×個数で）再計算 */
+  function recalcHistoryRow(r) {
+    var nm = r.querySelector(".h-content").value.trim();
+    var q = r.querySelector(".h-qty").value.trim();
+    var price = productPriceByName(nm);
+    if (price !== "" && q !== "" && !isNaN(Number(q))) {
+      r.querySelector(".h-amount").value = Number(price) * Number(q);
+    }
+  }
+  /* 商品行が変わったら候補を更新し、履歴の金額を再計算 */
+  function onProductsChanged() {
+    refreshRegProducts();
+    Array.prototype.forEach.call(document.querySelectorAll("#history-rows .hist-row"), function (r) {
+      recalcHistoryRow(r);
+    });
+  }
   function productRow(name, price) {
     var div = document.createElement("div");
     div.className = "dyn-row";
@@ -608,22 +677,28 @@
       '<button type="button" class="row-del" title="削除">' + TRASH_SVG + '</button>';
     div.querySelector(".p-name").value = name || "";
     div.querySelector(".p-price").value = (price === 0 || price) ? price : "";
+    div.querySelector(".p-name").addEventListener("change", onProductsChanged);
+    div.querySelector(".p-price").addEventListener("input", onProductsChanged);
     div.querySelector(".row-del").addEventListener("click", function () {
-      div.remove(); checkDynEmpty();
+      div.remove(); checkDynEmpty(); onProductsChanged();
     });
     return div;
   }
-  function historyRow(date, content, amount) {
+  function historyRow(date, content, qty, amount) {
     var div = document.createElement("div");
-    div.className = "dyn-row";
+    div.className = "dyn-row hist-row";
     div.innerHTML =
-      '<input type="date" class="h-date" style="flex:0 0 150px;">' +
-      '<input type="text" class="h-content" placeholder="取引内容" style="flex:2;">' +
-      '<input type="number" class="h-amount" placeholder="金額" style="flex:1;" min="0" step="1">' +
+      '<input type="date" class="h-date" style="flex:0 0 140px;">' +
+      '<input type="text" class="h-content" list="reg-products" placeholder="取引内容・商品名" style="flex:2;">' +
+      '<input type="number" class="h-qty" placeholder="個数" style="flex:0 0 72px;" min="0" step="1">' +
+      '<span class="yen-wrap" style="flex:1;"><span class="yen-mark">¥</span><input type="number" class="h-amount" placeholder="金額" min="0" step="1"></span>' +
       '<button type="button" class="row-del" title="削除">' + TRASH_SVG + '</button>';
     div.querySelector(".h-date").value = date || "";
     div.querySelector(".h-content").value = content || "";
+    div.querySelector(".h-qty").value = (qty === 0 || qty) ? qty : "";
     div.querySelector(".h-amount").value = (amount === 0 || amount) ? amount : "";
+    div.querySelector(".h-content").addEventListener("input", function () { recalcHistoryRow(div); });
+    div.querySelector(".h-qty").addEventListener("input", function () { recalcHistoryRow(div); });
     div.querySelector(".row-del").addEventListener("click", function () {
       div.remove(); checkDynEmpty();
     });
@@ -661,7 +736,8 @@
     var products = (c && c.products) || [];
     var history = (c && c.history) || [];
     products.forEach(function (p) { pr.appendChild(productRow(p.name, p.price)); });
-    history.forEach(function (h) { hr.appendChild(historyRow(h.date, h.content, h.amount)); });
+    history.forEach(function (h) { hr.appendChild(historyRow(h.date, h.content, h.qty, h.amount)); });
+    refreshRegProducts();
     checkDynEmpty();
 
     document.getElementById("edit-overlay").classList.add("show");
@@ -680,8 +756,13 @@
     Array.prototype.forEach.call(document.querySelectorAll("#history-rows .dyn-row"), function (r) {
       var date = r.querySelector(".h-date").value;
       var content = r.querySelector(".h-content").value.trim();
+      var qtyRaw = r.querySelector(".h-qty").value.trim();
       var amount = r.querySelector(".h-amount").value.trim();
-      if (date || content || amount) history.push({ date: date, content: content, amount: amount === "" ? "" : Number(amount) });
+      if (date || content || amount || qtyRaw) history.push({
+        date: date, content: content,
+        qty: qtyRaw === "" ? "" : Number(qtyRaw),
+        amount: amount === "" ? "" : Number(amount)
+      });
     });
     return { products: products, history: history };
   }
@@ -813,7 +894,8 @@
   document.getElementById("add-history").addEventListener("click", function () {
     var hr = document.getElementById("history-rows");
     var empty = hr.querySelector(".dyn-empty"); if (empty) empty.remove();
-    hr.appendChild(historyRow("", "", ""));
+    refreshRegProducts();
+    hr.appendChild(historyRow("", "", "", ""));
     hr.lastChild.querySelector(".h-content").focus();
   });
   document.getElementById("edit-save").addEventListener("click", saveEdit);
@@ -829,8 +911,8 @@
   document.getElementById("confirm-ok").addEventListener("click", doDelete);
   document.getElementById("confirm-cancel").addEventListener("click", closeConfirm);
 
-  // オーバーレイの外側クリックで閉じる
-  ["detail-overlay", "edit-overlay", "confirm-overlay"].forEach(function (idv) {
+  // オーバーレイの外側クリックで閉じる（編集モーダルは誤操作防止のため対象外）
+  ["detail-overlay", "confirm-overlay"].forEach(function (idv) {
     document.getElementById(idv).addEventListener("click", function (e) {
       if (e.target === this) this.classList.remove("show");
     });
