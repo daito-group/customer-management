@@ -98,6 +98,11 @@
   tbody tr:last-child td { border-bottom: none; }
   td.company { font-weight: 600; color: var(--main-color); }
   td.month-amt { text-align: right; white-space: nowrap; color: #333; font-variant-numeric: tabular-nums; }
+  td.prev-amt { text-align: right; white-space: nowrap; color: #888; font-variant-numeric: tabular-nums; }
+  td.yoy { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 600; }
+  td.yoy.yoy-up { color: #2563eb; }
+  td.yoy.yoy-down { color: #dc2626; }
+  td.yoy.yoy-na { color: #bbb; font-weight: 400; }
   .empty-row td { text-align: center; color: #999; padding: 40px 16px; }
 
   .imp {
@@ -280,6 +285,8 @@
           <th>営業担当</th>
           <th>重要度</th>
           <th id="amt-col-head" style="text-align:right; white-space:nowrap;">取引金額</th>
+          <th id="prev-col-head" style="text-align:right; white-space:nowrap;">昨年</th>
+          <th style="text-align:right; white-space:nowrap;">昨対比</th>
         </tr>
       </thead>
       <tbody id="cust-body"></tbody>
@@ -523,6 +530,21 @@
     var p = ym.split("-");
     return p[0] + "年" + Number(p[1]) + "月";
   }
+  /* 前年同月（"2026-05" → "2025-05"） */
+  function prevYearMonth(ym) {
+    if (!ym || ym.indexOf("-") === -1) return "";
+    var p = ym.split("-");
+    return (Number(p[0]) - 1) + "-" + p[1];
+  }
+  /* 昨対比セルのHTML（100%以上=青・未満=赤・前年実績なし=グレー） */
+  function yoyCell(c) {
+    var cur = monthAmount(c, selectedMonth);
+    var prev = monthAmount(c, prevYearMonth(selectedMonth));
+    if (prev <= 0) return '<td class="yoy yoy-na">—</td>';
+    var r = cur / prev * 100;
+    var cls = r >= 100 ? "yoy-up" : "yoy-down";
+    return '<td class="yoy ' + cls + '">' + r.toFixed(1) + "%</td>";
+  }
 
   /* ===== 一覧描画 ===== */
   function getFiltered() {
@@ -537,6 +559,16 @@
       return true;
     });
     list.sort(function (a, b) {
+      var aNo = !(a.rep && a.rep.trim());
+      var bNo = !(b.rep && b.rep.trim());
+      /* 営業担当なしは最下部へ */
+      if (aNo !== bNo) return aNo ? 1 : -1;
+      /* 担当なし同士は取引額の多い順 */
+      if (aNo && bNo) {
+        return (monthAmount(b, selectedMonth) - monthAmount(a, selectedMonth))
+          || (a.company || "").localeCompare(b.company || "", "ja");
+      }
+      /* 担当あり：営業担当順→重要度順→企業名 */
       return (a.rep || "").localeCompare(b.rep || "", "ja")
         || (impRank(a.importance) - impRank(b.importance))
         || (a.company || "").localeCompare(b.company || "", "ja");
@@ -548,6 +580,8 @@
     if (!selectedMonth) selectedMonth = latestDataMonth();
     var amtHead = document.getElementById("amt-col-head");
     if (amtHead) amtHead.textContent = (monthLabel(selectedMonth) ? monthLabel(selectedMonth) + " " : "") + "取引金額";
+    var prevHead = document.getElementById("prev-col-head");
+    if (prevHead) prevHead.textContent = (monthLabel(prevYearMonth(selectedMonth)) || "昨年") + " 取引金額";
 
     var body = document.getElementById("cust-body");
     var list = getFiltered();
@@ -555,7 +589,7 @@
       "全 " + customers.length + " 件" + (list.length !== customers.length ? "（表示 " + list.length + " 件）" : "");
 
     if (!list.length) {
-      body.innerHTML = '<tr class="empty-row"><td colspan="4">' +
+      body.innerHTML = '<tr class="empty-row"><td colspan="6">' +
         (customers.length ? "該当する取引先がありません。" : "まだ取引先が登録されていません。「＋ 新規登録」から追加してください。") +
         "</td></tr>";
     } else {
@@ -565,6 +599,8 @@
           '<td>' + esc(c.rep || "—") + "</td>" +
           '<td><span class="imp imp-' + esc(c.importance || "C") + '">' + esc(c.importance || "C") + "</span></td>" +
           '<td class="month-amt">' + esc(yen(monthAmount(c, selectedMonth))) + "</td>" +
+          '<td class="prev-amt">' + esc(yen(monthAmount(c, prevYearMonth(selectedMonth)))) + "</td>" +
+          yoyCell(c) +
           "</tr>";
       }).join("");
     }
@@ -573,7 +609,7 @@
   /* 営業担当フィルタの選択肢を現在のデータから生成 */
   function buildRepFilter() {
     var sel = document.getElementById("rep-filter");
-    var reps = [];
+    var reps = REPS.slice();
     customers.forEach(function (c) { if (c.rep && reps.indexOf(c.rep) === -1) reps.push(c.rep); });
     reps.sort(function (a, b) { return a.localeCompare(b, "ja"); });
     var cur = sel.value || "ALL";
