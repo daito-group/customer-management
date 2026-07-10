@@ -558,9 +558,6 @@
     "とんかつのみしな　カツカレー（調理済）"
   ];
 
-  /* 発送エリアの選択肢 */
-  var SHIP_AREAS = ["北海道", "関東", "中部", "近畿", "九州"];
-
   /* 削除ボタン用ゴミ箱アイコン（白黒） */
   var TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
 
@@ -852,9 +849,9 @@
 
     var prodHtml;
     if (products.length) {
-      prodHtml = '<table class="detail-table"><thead><tr><th>商品名</th><th>発送エリア</th><th style="text-align:right;">価格</th></tr></thead><tbody>' +
+      prodHtml = '<table class="detail-table"><thead><tr><th>商品名</th><th>枝番</th><th style="text-align:right;">単価</th></tr></thead><tbody>' +
         products.map(function (p) {
-          return "<tr><td>" + esc(p.name || "—") + "</td><td>" + esc(p.area || "—") +
+          return "<tr><td>" + esc(p.name || "—") + "</td><td>" + esc(p.eda || "—") +
             '</td><td class="num">' + esc(yen(p.price)) + "</td></tr>";
         }).join("") + "</tbody></table>";
     } else {
@@ -887,7 +884,7 @@
         '<span class="detail-company">' + esc(c.company || "（無名）") + "</span>" +
       "</div>" +
       '<div class="detail-rep">営業担当：<b>' + esc(c.rep || "未設定") + "</b></div>" +
-      '<div class="section-label">取引商品・価格・発送エリア</div>' + prodHtml +
+      '<div class="section-label">取引商品・枝番・単価</div>' + prodHtml +
       '<div class="section-label">取引履歴' + histCount + "</div>" + histHtml +
       '<div class="section-label">備考・メモ</div>' + memoHtml +
       '<div class="btn-row">' +
@@ -938,23 +935,16 @@
       recalcHistoryRow(r);
     });
   }
-  function productRow(name, price, area) {
+  function productRow(name, price, eda) {
     var div = document.createElement("div");
     div.className = "dyn-row";
-    var areaOpts = '<option value="">エリア</option>';
-    var inArea = false;
-    SHIP_AREAS.forEach(function (a) {
-      areaOpts += '<option value="' + esc(a) + '">' + esc(a) + '</option>';
-      if (a === area) inArea = true;
-    });
-    if (area && !inArea) areaOpts += '<option value="' + esc(area) + '">' + esc(area) + '</option>';
     div.innerHTML =
       '<input type="text" class="p-name" list="product-catalog" placeholder="商品名（選択・自由入力）" style="flex:2;">' +
-      '<select class="p-area" style="flex:0 0 96px;">' + areaOpts + '</select>' +
-      '<input type="number" class="p-price" placeholder="価格" style="flex:1;" min="0" step="1">' +
+      '<input type="text" class="p-eda" placeholder="枝番" style="flex:0 0 90px;">' +
+      '<input type="number" class="p-price" placeholder="単価" style="flex:1;" min="0" step="1">' +
       '<button type="button" class="row-del" title="削除">' + TRASH_SVG + '</button>';
     div.querySelector(".p-name").value = name || "";
-    div.querySelector(".p-area").value = area || "";
+    div.querySelector(".p-eda").value = eda || "";
     div.querySelector(".p-price").value = (price === 0 || price) ? price : "";
     div.querySelector(".p-name").addEventListener("change", onProductsChanged);
     div.querySelector(".p-name").addEventListener("input", onProductsChanged);
@@ -1017,7 +1007,7 @@
     var history = ((c && c.history) || []).slice().sort(function (a, b) {
       return String(b.date || "").localeCompare(String(a.date || ""));
     });
-    products.forEach(function (p) { pr.appendChild(productRow(p.name, p.price, p.area)); });
+    products.forEach(function (p) { pr.appendChild(productRow(p.name, p.price, p.eda)); });
     history.forEach(function (h) { hr.appendChild(historyRow(h.date, h.content, h.qty, h.amount)); });
     refreshRegProducts();
     checkDynEmpty();
@@ -1031,9 +1021,9 @@
     var products = [];
     Array.prototype.forEach.call(document.querySelectorAll("#product-rows .dyn-row"), function (r) {
       var name = r.querySelector(".p-name").value.trim();
-      var area = r.querySelector(".p-area").value;
+      var eda = r.querySelector(".p-eda").value.trim();
       var price = r.querySelector(".p-price").value.trim();
-      if (name || price || area) products.push({ name: name, area: area, price: price === "" ? "" : Number(price) });
+      if (name || price || eda) products.push({ name: name, eda: eda, price: price === "" ? "" : Number(price) });
     });
     var history = [];
     Array.prototype.forEach.call(document.querySelectorAll("#history-rows .dyn-row"), function (r) {
