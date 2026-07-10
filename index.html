@@ -312,6 +312,21 @@
     /* 昨対比の色を印刷にも反映 */
     td.yoy.yoy-up { color: #1d4ed8 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     td.yoy.yoy-down { color: #c0392b !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    /* 営業担当なしは印刷対象外 */
+    tbody tr.no-rep { display: none !important; }
+
+    /* 営業担当ごとに行を色分け（印刷で見分けやすく） */
+    tbody tr td, .print-header .p-leg { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    tbody tr[data-rep="高井"] td, .print-header .p-leg[data-rep="高井"] { background: #dcebfb !important; }
+    tbody tr[data-rep="田中"] td, .print-header .p-leg[data-rep="田中"] { background: #dff1e3 !important; }
+    tbody tr[data-rep="鈴木"] td, .print-header .p-leg[data-rep="鈴木"] { background: #fdeed4 !important; }
+    tbody tr[data-rep="吉田"] td, .print-header .p-leg[data-rep="吉田"] { background: #ece3f6 !important; }
+    tbody tr[data-rep="仁科"] td, .print-header .p-leg[data-rep="仁科"] { background: #fce1ec !important; }
+
+    /* 担当の凡例 */
+    .print-header .p-legend { font-size: 9px; color: #333; margin-top: 4px; }
+    .print-header .p-leg { display: inline-block; padding: 1px 9px; margin: 0 5px; border: 1px solid #b8bcc2; border-radius: 3px; }
   }
 </style>
 </head>
@@ -758,26 +773,34 @@
     /* 印刷用レポート見出し（合計・昨対比・出力日など） */
     var ph = document.getElementById("print-header");
     if (ph) {
-      var totCur = 0, totPrev = 0;
-      list.forEach(function (c) {
+      /* 印刷対象は「営業担当あり」の企業のみ */
+      var printList = list.filter(function (c) { return c.rep && c.rep.trim(); });
+      var totCur = 0, totPrev = 0, repsInPrint = [];
+      printList.forEach(function (c) {
         totCur += monthAmount(c, selectedMonth);
         totPrev += monthAmount(c, prevYearMonth(selectedMonth));
+        if (repsInPrint.indexOf(c.rep) === -1) repsInPrint.push(c.rep);
       });
+      repsInPrint.sort(function (a, b) { return a.localeCompare(b, "ja"); });
       var totYoy = totPrev > 0 ? (totCur / totPrev * 100).toFixed(1) + "%" : "—";
       var ftxt = [];
       if (filterRep !== "ALL") ftxt.push("担当: " + filterRep);
       if (filterImp !== "ALL") ftxt.push("重要度: " + filterImp);
       if (keyword.trim()) ftxt.push("検索: " + keyword.trim());
+      var legend = repsInPrint.map(function (r) {
+        return '<span class="p-leg" data-rep="' + esc(r) + '">' + esc(r) + "</span>";
+      }).join("");
       ph.innerHTML =
         '<div class="p-title">DAITO営業部　顧客別取引一覧（' + esc(monthLabel(selectedMonth)) + "）</div>" +
         '<div class="p-meta">' +
-          "対象: " + list.length + "件" +
+          "対象: " + printList.length + "件（営業担当あり）" +
           (ftxt.length ? "　｜　" + esc(ftxt.join(" / ")) : "") +
           "　｜　当月合計: " + esc(yen(totCur)) +
           "　｜　前年同月: " + esc(yen(totPrev)) +
           "　｜　昨対比: " + totYoy +
           "　｜　出力日: " + printDate() +
-        "</div>";
+        "</div>" +
+        (legend ? '<div class="p-legend">担当：' + legend + "</div>" : "");
     }
 
     if (!list.length) {
@@ -788,7 +811,8 @@
       body.innerHTML = list.map(function (c) {
         var prodNames = (c.products || []).map(function (p) { return p && p.name ? String(p.name).trim() : ""; }).filter(Boolean);
         var prodCell = prodNames.length ? esc(prodNames.join("、")) : '<span class="p-none">—</span>';
-        return '<tr data-id="' + esc(c.id) + '">' +
+        var repCls = c.rep ? "has-rep" : "no-rep";
+        return '<tr data-id="' + esc(c.id) + '" data-rep="' + esc(c.rep || "") + '" class="' + repCls + '">' +
           '<td class="company">' + esc(c.company || "（無名）") +
             (c.memo ? '<span class="c-detail">' + esc(c.memo) + "</span>" : "") + "</td>" +
           '<td class="products">' + prodCell + "</td>" +
