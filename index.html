@@ -48,6 +48,7 @@
     display: flex; flex-wrap: nowrap; align-items: center; gap: 10px;
     margin-bottom: 18px;
   }
+  .toolbar-sub { margin-top: -8px; }
   .toolbar input[type=search] {
     flex: 1 1 120px; min-width: 110px;
     padding: 9px 12px; font-size: 14px;
@@ -351,14 +352,17 @@
     <select id="rep-filter" aria-label="営業担当で絞り込み">
       <option value="ALL">すべての担当</option>
     </select>
+    <button type="button" class="print-btn" id="print-btn">🖨 印刷（A4）</button>
+    <button type="button" class="add-btn" id="add-btn">＋ 新規登録</button>
+  </div>
+
+  <div class="toolbar toolbar-sub">
     <div class="month-pick">
       <span class="mp-label">表示月</span>
       <button type="button" class="mp-arrow" id="month-prev" aria-label="前の月">‹</button>
       <select id="month-select" class="mp-select" aria-label="表示月を選択"></select>
       <button type="button" class="mp-arrow" id="month-next" aria-label="次の月">›</button>
     </div>
-    <button type="button" class="print-btn" id="print-btn">🖨 印刷（A4）</button>
-    <button type="button" class="add-btn" id="add-btn">＋ 新規登録</button>
   </div>
 
   <div class="count-line" id="count-line"></div>
