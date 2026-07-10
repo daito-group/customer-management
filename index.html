@@ -212,6 +212,7 @@
   .detail-table th { background: #f6f8fa; color: #667; font-weight: 600; white-space: nowrap; }
   .detail-table td.num { text-align: right; white-space: nowrap; }
   .detail-empty { color: #999; font-size: 13px; padding: 6px 2px; }
+  .detail-table td.store-prod { font-size: 12px; color: #667; }
   .detail-memo {
     background: #f6f8fa; border-radius: 6px; padding: 12px 14px;
     font-size: 14px; line-height: 1.7; white-space: pre-wrap; color: #444;
@@ -707,6 +708,17 @@
     var p = ym.split("-");
     return p[0] + "年" + Number(p[1]) + "月";
   }
+  /* 店舗の指定月売上（storeは{history:[...]}）*/
+  function storeMonthAmount(store, ym) {
+    var sum = 0;
+    (store.history || []).forEach(function (h) {
+      if (h && typeof h.date === "string" && ym && h.date.indexOf(ym) === 0) {
+        var n = Number(h.amount);
+        if (!isNaN(n) && h.amount !== "" && h.amount != null) sum += n;
+      }
+    });
+    return sum;
+  }
   /* 出力日（"2026年7月9日"） */
   function printDate() {
     var d = new Date();
@@ -877,6 +889,24 @@
     var memoHtml = c.memo ? '<div class="detail-memo">' + esc(c.memo) + "</div>"
       : '<div class="detail-empty">メモはありません。</div>';
 
+    /* 店舗別（親企業に集約されている場合のみ） */
+    var storeSection = "";
+    var stores = Array.isArray(c.stores) ? c.stores : [];
+    if (stores.length) {
+      var sortedStores = stores.slice().sort(function (a, b) {
+        return storeMonthAmount(b, selectedMonth) - storeMonthAmount(a, selectedMonth);
+      });
+      var rowsHtml = sortedStores.map(function (s) {
+        var pn = (s.products || []).map(function (p) { return p && p.name ? p.name : ""; }).filter(Boolean);
+        return "<tr><td>" + esc(s.name || "—") + '</td><td class="num">' + esc(yen(storeMonthAmount(s, selectedMonth))) +
+          '</td><td class="store-prod">' + (pn.length ? esc(pn.join("、")) : "—") + "</td></tr>";
+      }).join("");
+      storeSection =
+        '<div class="section-label">店舗・事業所別（' + stores.length + "店舗／" + esc(monthLabel(selectedMonth)) + "）</div>" +
+        '<div class="hist-scroll"><table class="detail-table"><thead><tr><th>店舗・事業所</th><th style="text-align:right;width:110px;">当月売上</th><th>取扱商品</th></tr></thead><tbody>' +
+        rowsHtml + "</tbody></table></div>";
+    }
+
     document.getElementById("detail-modal").innerHTML =
       '<button type="button" class="modal-close" data-detail-close aria-label="閉じる">✕</button>' +
       '<div class="detail-head">' +
@@ -885,6 +915,7 @@
       "</div>" +
       '<div class="detail-rep">営業担当：<b>' + esc(c.rep || "未設定") + "</b></div>" +
       '<div class="section-label">取引商品・枝番・単価</div>' + prodHtml +
+      storeSection +
       '<div class="section-label">取引履歴' + histCount + "</div>" + histHtml +
       '<div class="section-label">備考・メモ</div>' + memoHtml +
       '<div class="btn-row">' +
@@ -1118,6 +1149,7 @@
           importance: v.importance || "",
           products: Array.isArray(v.products) ? v.products : [],
           history: Array.isArray(v.history) ? v.history : [],
+          stores: Array.isArray(v.stores) ? v.stores : [],
           memo: v.memo || "",
           updatedAt: v.updatedAt || 0
         };
