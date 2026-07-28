@@ -97,7 +97,7 @@
   /* 一覧テーブル */
   .table-wrap {
     background: var(--card-bg); border-radius: 8px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.1); overflow-x: auto;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1); overflow: hidden;
   }
   table { width: 100%; border-collapse: collapse; table-layout: fixed; }
   thead th {
@@ -122,13 +122,16 @@
   td.products .p-none { color: #bbb; }
   /* 列幅（table-layout:fixed）：企業名は残り幅、取引商品はやや広め、他は狭く。金額/昨対比の見出しは折り返す */
   thead th:nth-child(1), tbody td:nth-child(1) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } /* 取引先企業名 */
-  thead th:nth-child(2), tbody td:nth-child(2) { width: 20%; }                                   /* 取引商品 */
-  thead th:nth-child(3), tbody td:nth-child(3) { width: 62px; white-space: nowrap; }             /* 営業担当 */
-  thead th:nth-child(4), tbody td:nth-child(4) { width: 50px; white-space: nowrap; text-align: center; } /* 重要度 */
+  thead th:nth-child(2), tbody td:nth-child(2) { width: 17%; }                                   /* 取引商品 */
+  thead th:nth-child(3), tbody td:nth-child(3) { width: 58px; white-space: nowrap; }             /* 営業担当 */
+  thead th:nth-child(4), tbody td:nth-child(4) { width: 48px; white-space: nowrap; text-align: center; } /* 重要度 */
   thead th:nth-child(5), tbody td:nth-child(5),
-  thead th:nth-child(6), tbody td:nth-child(6) { width: 104px; }                                 /* 金額 */
-  thead th:nth-child(7), tbody td:nth-child(7) { width: 58px; }                                  /* 昨対比 */
-  thead th:nth-child(5), thead th:nth-child(6), thead th:nth-child(7) { white-space: normal; padding-left: 8px; padding-right: 8px; } /* 金額/昨対比の見出しは折り返し可 */
+  thead th:nth-child(6), tbody td:nth-child(6) { width: 108px; }                                 /* 金額 */
+  thead th:nth-child(7), tbody td:nth-child(7) { width: 66px; }                                  /* 昨対比 */
+  thead th:nth-child(5), thead th:nth-child(6), thead th:nth-child(7) { white-space: normal; }   /* 金額/昨対比の見出しは折り返し可 */
+  /* 金額・昨対比セルは左右余白を詰めて数字を収める */
+  thead th:nth-child(5), thead th:nth-child(6), thead th:nth-child(7),
+  tbody td.month-amt, tbody td.prev-amt, tbody td.yoy { padding-left: 6px; padding-right: 8px; }
   /* 金額見出しは「年月」＋「取引金額」の2行に固定（各行は折り返さない） */
   thead th .amt-sub { display: block; white-space: nowrap; }
   thead th .amt-main { display: block; white-space: nowrap; }
